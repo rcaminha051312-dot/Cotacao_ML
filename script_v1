@@ -65,4 +65,5 @@ def melhor_preco():
         continuar=input("Você encontrou um preço melhor? 1-S/0-N\n")
         if continuar.strip().upper() not in ('S', '1'):
             return preco
-if __main__ in 
+if __name__ == "__main__":
+    main()
