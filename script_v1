@@ -1,0 +1,68 @@
+import pandas as pd
+import pyautogui as pa
+import webbrowser as wb
+from urllib.parse import quote
+
+def main():
+    cotacao_oficina='caminho da planilha'
+    df = pd.read_excel(cotacao_oficina, header=1)
+    lista_produtos=ler_produtos(df)
+    for i, produto in enumerate(lista_produtos):
+        if not produto:
+            continue
+        termo_pesquisa=quote(produto.replace(' ','-'))
+        url=f"https://lista.mercadolivre.com.br/"+{termo_pesquisa}+"_CustoFrete_Gratis_OrderId_PRICE_NoIndex_True"
+        
+        print(f"Pesquisando {produto}\n")
+        wb.open(url, new=0, autoraise=True)
+        print("Encontrando o menor preço\n")
+        menor_preco=melhor_preco()
+        print(f"O menor preço encontrado foi de {menor_preco}\n")
+        df.loc[i, '$ Un.']=menor_preco
+    df.to_excel('cotação_pronta.xlsx', index=False)    
+
+
+def ler_produtos(df):
+    df['produto'] = (df['Peça'].fillna('').astype(str).str.strip() + ' ' + df['Moto'].fillna('').astype(str).str.strip()).str.strip()
+    lista_produtos=df['produto'].tolist()
+    return lista_produtos
+
+def melhor_preco():
+    cord_max=None
+    maximo=r"D:\Projetos prog\python\ml cotacao\pngs\maximo.png"
+    while True:
+        preco=input("Qual o menor preço que você encontrou?\n")
+        preco=round(float(preco.replace(',', '.')),2)
+        pa.hotkey('alt','tab')
+        pa.sleep(0.5)
+        pa.hotkey('ctrl','home')
+        pa.sleep(0.5)
+        pa.hotkey('ctrl','f')
+        pa.sleep(0.5)
+        pa.typewrite("Preco")
+        pa.sleep(0.5)
+        pa.hotkey('ctrl','f')
+        pa.sleep(0.5)
+        pa.hotkey('ctrl','a')
+        pa.sleep(0.5)
+        pa.typewrite("Maximo")
+        pa.sleep(0.5)
+        try:
+            cord_max=pa.locateCenterOnScreen(maximo, confidence=0.75)
+        except pa.ImageNotFoundException:
+            print("Botão Máximo não encontrado, posicione o mouse acima do botão e aguarde\n")
+            print("Registrando em:\n3")
+            pa.sleep(1)
+            print("2")
+            pa.sleep(1)
+            print("1")
+            pa.sleep(1)
+            cord_max=pa.position()
+        pa.click(cord_max)
+        pa.typewrite(preco)
+        pa.press('enter')
+        pa.hotkey('alt','tab')
+        continuar=input("Você encontrou um preço melhor? 1-S/0-N\n")
+        if continuar.strip().upper() not in ('S', '1'):
+            return preco
+if __main__ in 
