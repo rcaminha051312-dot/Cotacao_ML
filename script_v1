@@ -4,21 +4,21 @@ import webbrowser as wb
 from urllib.parse import quote
 
 def main():
-    cotacao_oficina='caminho da planilha'
-    df = pd.read_excel(cotacao_oficina, header=1)
+    cotacao_oficina=r'C:\Users\Escudo Compras\Desktop\Compras\Orçamento oficina.xlsx'
+    df = pd.read_excel(cotacao_oficina, header=3)
     lista_produtos=ler_produtos(df)
     for i, produto in enumerate(lista_produtos):
         if not produto:
             continue
-        termo_pesquisa=quote(produto.replace(' ','-'))
-        url=f"https://lista.mercadolivre.com.br/"+{termo_pesquisa}+"_CustoFrete_Gratis_OrderId_PRICE_NoIndex_True"
+        termo_pesquisa= str(quote(produto.replace(' ','-')))
+        url=f"https://lista.mercadolivre.com.br/{termo_pesquisa}"+"_CustoFrete_Gratis_OrderId_PRICE_NoIndex_True"
         
         print(f"Pesquisando {produto}\n")
         wb.open(url, new=0, autoraise=True)
         print("Encontrando o menor preço\n")
-        menor_preco=melhor_preco()
+        menor_preco=melhor_preco(termo_pesquisa)
         print(f"O menor preço encontrado foi de {menor_preco}\n")
-        df.loc[i, '$ Un.']=menor_preco
+        df.loc[i, '$ Un.']=float(menor_preco)
     df.to_excel('cotação_pronta.xlsx', index=False)    
 
 
@@ -27,41 +27,20 @@ def ler_produtos(df):
     lista_produtos=df['produto'].tolist()
     return lista_produtos
 
-def melhor_preco():
-    cord_max=None
-    maximo=r"D:\Projetos prog\python\ml cotacao\pngs\maximo.png"
+def melhor_preco(termo_pesquisa):
     while True:
+        pa.hotkey('alt', 'tab')
         preco=input("Qual o menor preço que você encontrou?\n")
-        preco=round(float(preco.replace(',', '.')),2)
-        pa.hotkey('alt','tab')
+        pa.hotkey('alt', 'tab')
+        pa.sleep(1)
+        range='PriceRange_0-' + str(preco)
+        url=f"https://lista.mercadolivre.com.br/{termo_pesquisa}_CustoFrete_Gratis_OrderId_PRICE_{range}_NoIndex_True"
+        pa.hotkey('ctrl', 'l')
         pa.sleep(0.5)
-        pa.hotkey('ctrl','home')
+        pa.typewrite(url)
         pa.sleep(0.5)
-        pa.hotkey('ctrl','f')
-        pa.sleep(0.5)
-        pa.typewrite("Preco")
-        pa.sleep(0.5)
-        pa.hotkey('ctrl','f')
-        pa.sleep(0.5)
-        pa.hotkey('ctrl','a')
-        pa.sleep(0.5)
-        pa.typewrite("Maximo")
-        pa.sleep(0.5)
-        try:
-            cord_max=pa.locateCenterOnScreen(maximo, confidence=0.75)
-        except pa.ImageNotFoundException:
-            print("Botão Máximo não encontrado, posicione o mouse acima do botão e aguarde\n")
-            print("Registrando em:\n3")
-            pa.sleep(1)
-            print("2")
-            pa.sleep(1)
-            print("1")
-            pa.sleep(1)
-            cord_max=pa.position()
-        pa.click(cord_max)
-        pa.typewrite(preco)
         pa.press('enter')
-        pa.hotkey('alt','tab')
+        pa.sleep(0.5)
         continuar=input("Você encontrou um preço melhor? 1-S/0-N\n")
         if continuar.strip().upper() not in ('S', '1'):
             return preco
