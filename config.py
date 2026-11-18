@@ -1,0 +1,15 @@
+from selenium.webdriver.common.by import By
+class seletores:
+    idBotaoNovaNota="botao_novo"
+    seletorTipoNota="select[dbid='enum_tipodocfiscal']"
+    dbidNumero="input[dbid='numero']"
+    seletordescricao="input[dbid='descricao']"
+    idDataEmissao="//a[contains(@class, 'input-group') and placeholder='mydate']"
+    idValor="input[dbid='valor']"
+    seletorFornecedor="select[dbid='id_fornecedor']"
+    seletorCentroCusto="select[dbid='id_centrocusto']"
+    seletorPlanoConta="select[dbid='enum_planoconta']"
+    seletorCategoria="select[dbid='enum_categoria']"
+    seletorVeiculo="select[dbid='id_veiculo']"
+    botaoAssociar="//a[contains(@class, 'form-button') and text()='Associar']"
+    botaoSalvar="//a[contains(@class, 'btn btn-primary') and text()='Salvar']"
