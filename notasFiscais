@@ -1,180 +1,243 @@
-def lancarNota(driver):
-    import json
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support import expected_conditions as EC
-    from selenium.webdriver.support.select import Select
-    from config import seletores
-    from selenium.webdriver.support.ui import WebDriverWait
+import os
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.select import Select
+from config import seletores
+from selenium.webdriver.support.ui import WebDriverWait
+import xml.etree.ElementTree as ET 
+from datetime import datetime 
 
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException
+
+def configurar_navegador():
+    print("Abrindo navegador")
+    #perfil_path = os.path.abspath(r'C:\Users\Escudo Compras\Desktop\cotacao_ml\configNavegador')
+    options = Options() 
+    #options.add_argument(f"--user-data-dir={perfil_path}")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.page_load_strategy = 'none'
+    service = webdriver.ChromeService()
+    driver = webdriver.Chrome(service=service, options=options)
+    return (driver)
+
+def lancarNota(driver):
+    NS = {"n": "http://www.portalfiscal.inf.br/nfe"}
+    caminho_xml="C:/Users/Escudo Compras/Desktop/cotacao_ml/NFs"
+    
+    def formatar_data(valor: str | None) -> str | None:  # converte a data ISO para DD-MM-AAAA
+        if not valor: 
+            return None 
+        return datetime.fromisoformat(valor.strip()).strftime("%d-%m-%Y")
+
+    def extrair_dados(caminho_xml: str) -> dict:  # função principal: só extrai e retorna
+                ide = ET.parse(caminho_xml).getroot().find(".//n:ide", NS)
+                if ide is None:
+                    raise ValueError("Tag <ide> não encontrada no XML")
+    
+                def texto(tag):
+                    el = ide.find(f"n:{tag}", NS)
+                    return el.text.strip() if el is not None and el.text else None
+    
+                return {  # monta o dicionário final
+                    "nNF": texto("nNF") or "0",  # número da NF como está; "0" se ausente
+                    "dhEmi": formatar_data(texto("dhEmi")) or datetime.now().strftime("%d-%m-%Y"),  # data de emissão no formato DD-MM-AAAA
+                    "vNFTot": texto("vNFTot").replace(".", ",") or "0,00",  # valor da NF como está; "0.00" se ausente
+                }
+    arquivos_xml= [i for i in os.listdir(caminho_xml) if i.lower().endswith(".xml")]
+
+    for nome_xml in arquivos_xml:
+        dados= extrair_dados(os.path.join(caminho_xml, nome_xml))
+    
     url="https://expfrota.com.br/#/notasfiscais"
+    driver=webdriver(chrome)
 
     driver.get(url)
-    novaNota = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, seletores.idBotaoNovaNota)))
-    novaNota.click()
+    for nota in nome_xml:
+        print(f"Lançando nota {nota}")
+        novaNota = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, seletores.idBotaoNovaNota)))
+        novaNota.click()
 
-    with open("notasFiscais.json", "r", encoding="utf-8") as arquivo:
-        dados = json.load(arquivo)
+        dados = extrair_dados(caminho_xml)
+        numeroNf=dados["nNF"]
+        datEmi=dados["dhEmi"]
+        valorNf=dados["vNF"]
 
-    #Preencher os campos da nota fiscal com os dados do arquivo JSON
-    #Selecionar o tipo de nota fiscal
-    campoTipo=driver.find_element(By.CSS_SELECTOR, seletores.seletorTipoNota)
-    campoTipo.select_by_value(dados['Tipo'])
-    WebDriverWait(driver, 1)
-
-    #Preencher os números da nota fiscal
-    campoNumero=driver.find_element(By.CSS_SELECTOR, seletores.dbidNumero)
-    campoNumero.clear()
-    campoNumero.send_keys(str(dados['Numero']))
-    WebDriverWait(driver, 1)
-
-    #preencher a descrição da nota fiscal
-    descricao=input("Qual a descrição da nota fiscal?\n")
-    campoDescricao=driver.find_element(By.CSS_SELECTOR, seletores.seletordescricao)
-    campoDescricao.clear()
-    campoDescricao.send_keys(descricao)
-    WebDriverWait(driver, 1)
-
-    #preencher a data de emissão da nota fiscal
-    campoDataEmissao=driver.find_element(By.ID, seletores.idDataEmissao)
-    driver.execute_script("arguments[0].removeAttribute('readonly');", campoDataEmissao)
-    campoDataEmissao.clear()
-    campoDataEmissao.send_keys(dados['DataEmissao'])
-    WebDriverWait(driver, 1)
-
-    #preencher o valor da nota fiscal
-    campoValor=driver.find_element(By.CSS_SELECTOR, seletores.idValor)
-    campoValor.clear()
-    campoValor.send_keys(str(dados['Valor']))
-    WebDriverWait(driver, 1)
-
-    #preencher o fornecedor da nota fiscal
-    campoFornecedor=driver.find_element(By.CSS_SELECTOR, seletores.seletorFornecedor)
-    fornecedor=input("Qual o fornecedor da compra? Digite 1 para mercado livre ou digite o nome do fornecedor para outros\n")
-    if fornecedor=="1":
-        fornecedor="Mercado Livre"
-    campoFornecedor.clear()
-    campoFornecedor.send_keys(fornecedor)
-    campoFornecedor.send_keys('\uE007')
-    WebDriverWait(driver, 1)
-
-    #preencher o centro de custo da nota fiscal
-    campoCentroCusto=driver.find_element(By.CSS_SELECTOR, seletores.seletorCentroCusto)
-    campoCentroCusto.clear()
-   
-    while True:
-        inputCentroCusto=input("Digite o número do centro de custo\n(0)-RIVIERA\n(1)-SUPERVISÃO\n(2)-MIRANTE DAS AGUAS\n(3)-BRISA DO VALE\n(4)-GARDEN HILL\n(5)-VILLAGE DA SERRA\n(6)-GOLDENSUN\n(7)-VENDAS\n(8)-C.A LIDERES\n(9)-ESTOQUE\n")
-        match inputCentroCusto:
-            case "0":
-                campoCentroCusto.send_keys("RIVIERA")
-                break
-            case "1":
-                campoCentroCusto.send_keys("SUPERVISÃO")
-                break
-            case "2":
-                campoCentroCusto.send_keys("MIRANTE DAS AGUAS")
-                break
-            case "3":
-                campoCentroCusto.send_keys("BRISA DO VALE")
-                break
-            case "4":
-                campoCentroCusto.send_keys("GARDEN HILL")
-                break
-            case "5": 
-                campoCentroCusto.send_keys("VILLAGE DA SERRA")
-                break
-            case "6":
-                campoCentroCusto.send_keys("GOLDENSUN")
-                break
-            case "7":
-                campoCentroCusto.send_keys("VENDAS")
-                break
-            case "8":
-                campoCentroCusto.send_keys("C.A LIDERES")
-                break   
-            case "9":
-                campoCentroCusto.send_keys("ESTOQUE")
-                break
-            case _:
-                print("Opção inválida. Por favor, insira um número de 0 a 9.")
-       
-    campoCentroCusto.send_keys('\uE007')
-    WebDriverWait(driver, 1)
-
-    #preencher o plano de conta da nota fiscal
-    campoPlanoConta=driver.find_element(By.CSS_SELECTOR, seletores.seletorPlanoConta)
-    campoPlanoConta.clear()
-    
-    while True:
-        inputPlanoConta=input("(1)-BORRACHARIA\n(2)-MANUTENÇÃO\n(3)-OFICINA LIMPEZA E USO GERAL\n(4)-Papelaria\n(5)-PINTURA\n(6)-POSTO\n(7)-UNIFORMES\n")
-        match inputPlanoConta:
-            case "1":
-                campoPlanoConta.send_keys("BORRACHARIA")
-                break
-            case "2":
-                campoPlanoConta.send_keys("MANUTENÇÃO")
-                break
-            case "3":
-                campoPlanoConta.send_keys("OFICINA LIMPEZA E USO GERAL")
-                break
-            case "4":
-                campoPlanoConta.send_keys("Papelaria")
-                break
-            case "5":
-                campoPlanoConta.send_keys("PINTURA")
-                break
-            case "6":
-                campoPlanoConta.send_keys("POSTO")
-                break
-            case "7":
-                campoPlanoConta.send_keys("UNIFORMES")
-                break
-            case _:
-                print("Opção inválida. Por favor, insira um número de 1 a 7.")
-
-    campoPlanoConta.send_keys('\uE007')
-    WebDriverWait(driver, 1)
-
-    #preencher a categoria da nota fiscal
-    campoCategoria=driver.find_element(By.CSS_SELECTOR, seletores.seletorCategoria)
-    campoCategoria.clear()
-    inputCategoria=input("(1)-Custo fixo\n(2)-Custo variável\n(3)-Viagem")
-    while True:
-        match inputCategoria:
-            case "1":
-                campoCategoria.send_keys("Custo fixo")
-                break
-            case "2":
-                campoCategoria.send_keys("Custo variável")
-                break
-            case "3":
-                campoCategoria.send_keys("Viagem")
-                break
-            case _:
-                print("Opção inválida. Por favor, insira um número de 1 a 3.")
-
-    campoCategoria.send_keys('\uE007')
-    WebDriverWait(driver, 1)
-
-    #preencher o item comprado
-    lancarRegistro=input("Deseja lançar algum registro? (S/N): ")
-    if lancarRegistro.strip().upper() in ('S', '1'):
-        input("Pressione Enter para continuar...")
-
-    #Associar o veículo à nota fiscal, se necessário
-    selecionarVeiculo=input("Deseja selecionar um veículo? (S/N): ")
-    if selecionarVeiculo.strip().upper() in ('S', '1'):
-        veiculo=input("Digite a placa do veículo que deseja selecionar: ")
-        campoVeiculo=driver.find_element(By.CSS_SELECTOR, seletores.seletorVeiculo)
-        campoVeiculo.clear()
-        campoVeiculo.send_keys(veiculo.upper())
-        campoVeiculo.send_keys('\uE007')
-        botaoAssociar=driver.find_element(By.XPATH, seletores.  botaoAssociar)
-        botaoAssociar.click()
+        #Preencher os campos da nota fiscal com os dados do PDF
+        #Selecionar o tipo de nota fiscal
+        tipo=input("<-----Qual o tipo de nota fiscal? (1)-DANFE (2)-Nota Fiscal (3)-Recibo----->\n")
+        if (tipo==1):
+            tipoNf="DANFE"
+        elif (tipo==2):
+            tipoNf="Nota Fiscal"
+        elif (tipo==3):
+            tipoNf="Recibo"
+        else:
+            print("Tipo inválido, preenchendo como DANFE\n")
+            tipoNf="DANFE"
+        campoTipo=driver.find_element(By.CSS_SELECTOR, seletores.seletorTipoNota)
+        campoTipo.select_by_value(tipoNf)
         WebDriverWait(driver, 1)
 
-    #Salvar a nota fiscal
-    botaoSalvar=driver.find_element(By.XPATH, seletores.botaoSalvar)
-    botaoSalvar.click()
-    WebDriverWait(driver, 1)
+        #Preencher os números da nota fiscal
+        campoNumero=driver.find_element(By.CSS_SELECTOR, seletores.dbidNumero)
+        campoNumero.clear()
+        campoNumero.send_keys(numeroNf)
+        WebDriverWait(driver, 1)
 
+        #preencher a descrição da nota fiscal
+        descricao=input("Qual a descrição da nota fiscal?\n")
+        campoDescricao=driver.find_element(By.CSS_SELECTOR, seletores.seletordescricao)
+        campoDescricao.clear()
+        campoDescricao.send_keys(descricao)
+        WebDriverWait(driver, 1)
+
+        #preencher a data de emissão da nota fiscal
+        campoDataEmissao=driver.find_element(By.ID, seletores.idDataEmissao)
+        driver.execute_script("arguments[0].removeAttribute('readonly');", campoDataEmissao)
+        campoDataEmissao.clear()
+        campoDataEmissao.send_keys(datEmi)
+        WebDriverWait(driver, 1)
+
+        #preencher o valor da nota fiscal
+        campoValor=driver.find_element(By.CSS_SELECTOR, seletores.idValor)
+        campoValor.clear()
+        campoValor.send_keys(valorNf)
+        WebDriverWait(driver, 1)
+
+        #preencher o fornecedor da nota fiscal
+        campoFornecedor=driver.find_element(By.CSS_SELECTOR, seletores.seletorFornecedor)
+        fornecedor=input("Qual o fornecedor da compra? Digite 1 para mercado livre ou digite o nome do fornecedor para outros\n")
+        if fornecedor=="1":
+            fornecedor="Mercado Livre"
+        campoFornecedor.clear()
+        campoFornecedor.send_keys(fornecedor)
+        campoFornecedor.send_keys('\uE007')
+        WebDriverWait(driver, 1)
+
+        #preencher o centro de custo da nota fiscal
+        campoCentroCusto=driver.find_element(By.CSS_SELECTOR, seletores.seletorCentroCusto)
+        campoCentroCusto.clear()    
+        while True:
+            inputCentroCusto=input("Digite o número do centro de custo\n(0)-RIVIERA\n(1)-SUPERVISÃO\n(2)-MIRANTE DAS AGUAS\n(3)-BRISA DO VALE\n(4)-GARDEN HILL\n(5)-VILLAGE DA SERRA\n(6)-GOLDENSUN\n(7)-VENDAS\n(8)-C.A LIDERES\n(9)-ESTOQUE\n")
+            match inputCentroCusto:
+                case "0":
+                    campoCentroCusto.send_keys("RIVIERA")
+                    break
+                case "1":
+                    campoCentroCusto.send_keys("SUPERVISÃO")
+                    break
+                case "2":
+                    campoCentroCusto.send_keys("MIRANTE DAS AGUAS")
+                    break
+                case "3":
+                    campoCentroCusto.send_keys("BRISA DO VALE")
+                    break
+                case "4":
+                    campoCentroCusto.send_keys("GARDEN HILL")
+                    break
+                case "5": 
+                    campoCentroCusto.send_keys("VILLAGE DA SERRA")
+                    break
+                case "6":
+                    campoCentroCusto.send_keys("GOLDENSUN")
+                    break
+                case "7":
+                    campoCentroCusto.send_keys("VENDAS")
+                    break
+                case "8":
+                    campoCentroCusto.send_keys("C.A LIDERES")
+                    break   
+                case "9":
+                    campoCentroCusto.send_keys("ESTOQUE")
+                    break
+                case _:
+                    print("Opção inválida. Por favor, insira um número de 0 a 9.")
+        campoCentroCusto.send_keys('\uE007')
+        WebDriverWait(driver, 1)
+
+        #preencher o plano de conta da nota fiscal
+        campoPlanoConta=driver.find_element(By.CSS_SELECTOR, seletores.seletorPlanoConta)
+        campoPlanoConta.clear()        
+        while True:
+            inputPlanoConta=input("(1)-BORRACHARIA\n(2)-MANUTENÇÃO\n(3)-OFICINA LIMPEZA E USO GERAL\n(4)-Papelaria\n(5)-PINTURA\n(6)-POSTO\n(7)-UNIFORMES\n")
+            match inputPlanoConta:
+                case "1":
+                    campoPlanoConta.send_keys("BORRACHARIA")
+                    break
+                case "2":
+                    campoPlanoConta.send_keys("MANUTENÇÃO")
+                    break
+                case "3":
+                    campoPlanoConta.send_keys("OFICINA LIMPEZA E USO GERAL")
+                    break
+                case "4":
+                    campoPlanoConta.send_keys("Papelaria")
+                    break
+                case "5":
+                    campoPlanoConta.send_keys("PINTURA")
+                    break
+                case "6":
+                    campoPlanoConta.send_keys("POSTO")
+                    break
+                case "7":
+                    campoPlanoConta.send_keys("UNIFORMES")
+                    break
+                case _:
+                    print("Opção inválida. Por favor, insira um número de 1 a 7.")
+        campoPlanoConta.send_keys('\uE007')
+        WebDriverWait(driver, 1)
+
+        #preencher a categoria da nota fiscal
+        campoCategoria=driver.find_element(By.CSS_SELECTOR, seletores.seletorCategoria)
+        campoCategoria.clear()
+        while True:
+            inputCategoria=input("(1)-Custo fixo\n(2)-Custo variável\n(3)-Viagem")
+            match inputCategoria:
+                case "1":
+                    campoCategoria.send_keys("Custo fixo")
+                    break
+                case "2":
+                    campoCategoria.send_keys("Custo variável")
+                    break
+                case "3":
+                    campoCategoria.send_keys("Viagem")
+                    break
+                case _:
+                    print("Opção inválida. Por favor, insira um número de 1 a 3.")
+        campoCategoria.send_keys('\uE007')
+        WebDriverWait(driver, 1)
+
+        #preencher o item comprado
+        lancarRegistro=input("Deseja lançar algum registro? (S/N): ")
+        if lancarRegistro.strip().upper() in ('S', '1'):
+            input("Pressione Enter para continuar...")
+
+        #Associar o veículo à nota fiscal, se necessário
+        selecionarVeiculo=input("Deseja selecionar um veículo? (S/N): ")
+        if selecionarVeiculo.strip().upper() in ('S', '1'):
+            veiculo=input("Digite a placa do veículo que deseja selecionar: ")
+            campoVeiculo=driver.find_element(By.CSS_SELECTOR, seletores.seletorVeiculo)
+            campoVeiculo.clear()
+            campoVeiculo.send_keys(veiculo.upper())
+            campoVeiculo.send_keys('\uE007')
+            botaoAssociar=driver.find_element(By.XPATH, seletores.  botaoAssociar)
+            botaoAssociar.click()
+            WebDriverWait(driver, 1)
+
+        #Salvar a nota fiscal
+        botaoSalvar=driver.find_element(By.XPATH, seletores.botaoSalvar)
+        print(botaoSalvar)
+        #botaoSalvar.click()
+        WebDriverWait(driver, 1)
     return()
+
+if __name__ == '__main__':
+    configurar_navegador()
+    lancarNota(driver)

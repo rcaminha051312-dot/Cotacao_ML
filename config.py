@@ -1,4 +1,3 @@
-from selenium.webdriver.common.by import By
 class seletores:
     idBotaoNovaNota="botao_novo"
     seletorTipoNota="select[dbid='enum_tipodocfiscal']"
